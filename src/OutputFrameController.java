@@ -13,6 +13,10 @@ import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.RowConstraints;
 
+import javafx.animation.PauseTransition;
+import javafx.util.Duration;
+import javafx.application.Platform;
+
 import java.io.IOException;
 
 /**
@@ -50,7 +54,12 @@ public class OutputFrameController {
     private int playerOScore;
     private int roundsLeft;
     private boolean isBotFirst;
+    private boolean isHumanX, isHumanO;
     private Bot bot;
+    private Bot Xbot;
+    private float delay = 0.3f;
+
+    private String playerX, playerO;
 
 
     private static final int ROW = 8;
@@ -69,18 +78,57 @@ public class OutputFrameController {
      * @param isBotFirst True if bot is first, false otherwise.
      *
      */
-    void getInput(String name1, String name2, String rounds, boolean isBotFirst){
+    void getInput(String name1, String name2, String rounds, boolean isBotFirst, String playerX, String playerO){
         this.playerXName.setText(name1);
         this.playerOName.setText(name2);
         this.roundsLeftLabel.setText(rounds);
         this.roundsLeft = Integer.parseInt(rounds);
         this.isBotFirst = isBotFirst;
 
+        this.playerX = playerX;
+        this.playerO = playerO;
+        
+        System.out.println(playerX + " " + playerO);
+
+        if (playerX.equals("Human")) {
+            this.isHumanX = true;
+        } else if (playerX.equals("Genetic")) {
+            this.Xbot = new Genetic();
+        } else if (playerX.equals("Minimax")) {
+            this.Xbot = new Minimax();
+        } else if (playerX.equals("Hill Climbing")) {
+            this.Xbot = new HillClimbing();
+        } else {
+            this.Xbot = new Minimax();
+        }
+
+        System.out.println("HEllo " + playerX.toString() + " " + isHumanX);
+        System.out.println("HEllo " + playerO.toString());
+
+        if (playerO.equals("Human")) {
+            this.isHumanO = true;
+        } else if (playerO.equals("Genetic")) {
+            this.bot = new Genetic();
+        } else if (playerO.equals("Minimax")) {
+            this.bot = new Minimax();
+        } else if (playerO.equals("Hill Climbing")) {
+            this.bot = new HillClimbing();
+        } else {
+            this.bot = new Minimax();
+        }
+
         // Start bot
-        this.bot = new Bot();
         this.playerXTurn = !isBotFirst;
         if (this.isBotFirst) {
-            this.moveBot();
+            // this.moveBot();
+            if (!this.isHumanO) {
+                this.moveOBot();
+            }
+        } else {
+            if (!this.isHumanX) {
+                this.moveXBot();
+            }
+            System.out.println("Bot is second");
         }
     }
 
@@ -194,10 +242,11 @@ public class OutputFrameController {
 
                 if (isBotFirst && this.roundsLeft == 0) {
                     this.endOfGame();
+                } else {
+                    if (!this.isHumanO && this.roundsLeft > 0) {
+                        this.moveOBot();
+                    } 
                 }
-
-                // Bot's turn
-                this.moveBot();
             }
             else {
                 this.playerXBoxPane.setStyle("-fx-background-color: #90EE90; -fx-border-color: #D3D3D3;");
@@ -215,6 +264,10 @@ public class OutputFrameController {
 
                 if (!isBotFirst && this.roundsLeft == 0) { // Game has terminated.
                     this.endOfGame();       // Determine & announce the winner.
+                } else {
+                    if (!this.isHumanX && this.roundsLeft > 0) {
+                        this.moveXBot();
+                    }
                 }
             }
         }
@@ -318,7 +371,7 @@ public class OutputFrameController {
         // Disable the game board buttons to prevent from playing further.
         for (int i = 0; i < ROW; i++)
             for (int j = 0; j < COL; j++)
-                this.buttons[i][j].setDisable(true);
+                this.buttons[i][j].setDisable(true);  
     }
 
 
@@ -352,17 +405,73 @@ public class OutputFrameController {
         primaryStage.show();
     }
 
-    private void moveBot() {
-        int[] botMove = this.bot.move();
-        int i = botMove[0];
-        int j = botMove[1];
+    private void moveXBot() {
+        PauseTransition pause = new PauseTransition(Duration.seconds(this.delay));
+        pause.setOnFinished(event -> {
+            System.out.println("After Pause");
+        
+            int[] botMove;
 
-        if (!this.buttons[i][j].getText().equals("")) {
-            new Alert(Alert.AlertType.ERROR, "Bot Invalid Coordinates. Exiting.").showAndWait();
-            System.exit(1);
-            return;
-        }
+            if (this.playerX.equals("Minimax")){
+                botMove = this.Xbot.move(this.buttons, "X", this.roundsLeft);
+            } else if (this.playerX.equals("Genetic")) {
+                botMove = this.Xbot.move(this.buttons, "X", this.roundsLeft);
+            } else if (this.playerX.equals("Hill Climbing")) {
+                botMove = this.Xbot.move(this.buttons, "X");
+            } else {
+                botMove = this.Xbot.move(this.buttons, "X", this.roundsLeft);
+            }
 
-        this.selectedCoordinates(i, j);
+            int i = botMove[0];
+            int j = botMove[1];
+
+            if (!this.buttons[i][j].getText().equals("")) {
+                Platform.runLater(() -> {
+                    new Alert(Alert.AlertType.ERROR, "Bot Invalid Coordinates. Exiting.").showAndWait();
+                    System.exit(1);
+                });
+                return;
+            }
+
+            Platform.runLater(() -> {
+                this.selectedCoordinates(i, j);
+            });
+        });
+
+        pause.play();
     }
+
+    private void moveOBot() {
+        PauseTransition pause = new PauseTransition(Duration.seconds(this.delay));
+        pause.setOnFinished(event -> {
+            int[] botMove;
+            if (this.playerO.equals("Minimax")){
+                botMove = this.bot.move(this.buttons, "O", this.roundsLeft);
+            } else if (this.playerO.equals("Genetic")) {
+                botMove = this.bot.move(this.buttons, "O", this.roundsLeft);
+            } else if (this.playerO.equals("Hill Climbing")) {
+                botMove = this.bot.move(this.buttons, "O");
+            } else {
+                botMove = this.bot.move(this.buttons, "O", this.roundsLeft);
+            }
+            
+            int i = botMove[0];
+            int j = botMove[1];
+    
+            if (!this.buttons[i][j].getText().equals("")) {
+                Platform.runLater(() -> {
+                    new Alert(Alert.AlertType.ERROR, "Bot Invalid Coordinates. Exiting.").showAndWait();
+                    System.exit(1);
+                });
+                return;
+            }
+            
+            Platform.runLater(() -> {
+                this.selectedCoordinates(i, j);
+            });
+        });
+    
+        pause.play();
+    }
+    
 }
